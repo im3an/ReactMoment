@@ -13,7 +13,7 @@
 
 </div>
 
-## 📱 Über VibeQuest
+## 📱 Über ReactMoment
 
 VibeQuest ist ein digitaler Treffpunkt für Freundesgruppen, die täglich neue Mini-Challenges erhalten und diese innerhalb von 24 Stunden lösen. Dabei steht nicht das Reden, sondern das Reagieren im Mittelpunkt: Nutzer*innen teilen Erlebnisse und Gefühle rein visuell und emotional – über Emojis, Sounds und Reactions. Keine Chats, keine Kommentare, keine klassischen Nachrichten. Die App schafft eine lebendige, spontane Atmosphäre, die Nähe trotz Distanz ermöglicht.
 
