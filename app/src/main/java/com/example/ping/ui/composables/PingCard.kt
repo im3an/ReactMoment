@@ -1,9 +1,12 @@
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.*
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -12,10 +15,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -24,8 +30,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ping.R
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import com.example.ping.ui.composables.ReactionBar
 import com.example.ping.ui.composables.Reaction
 
@@ -65,48 +69,106 @@ fun ChallengeCard(
         )
     }
 
+    // Animation states
+    var isPressed by remember { mutableStateOf(false) }
+    val hapticFeedback = LocalHapticFeedback.current
+    val interactionSource = remember { MutableInteractionSource() }
+
+    // Card colors with smooth transition
     val cardColors = if (userResponded) {
-        CardDefaults.cardColors(
-            containerColor = Color(0xFFF0F7FF)
-        )
+        CardDefaults.cardColors(containerColor = Color(0xFFF0F7FF))
     } else {
-        CardDefaults.cardColors(
-            containerColor = Color.White
-        )
+        CardDefaults.cardColors(containerColor = Color.White)
     }
 
-    var pulseAnimation by remember { mutableStateOf(false) }
-    val animatedScale = animateFloatAsState(
-        targetValue = if (pulseAnimation) 1.05f else 1f,
-        label = "scaleAnimation"
+    // Heartbeat animation for non-responded cards
+    val infiniteTransition = rememberInfiniteTransition(label = "heartbeat")
+    val heartbeatScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (!userResponded) 1.03f else 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = 1200,
+                easing = EaseInOutCubic
+            ),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "heartbeatScale"
     )
 
-    LaunchedEffect(key1 = Unit) {
-        while (!userResponded) {
-            pulseAnimation = true
-            delay(2000)
-            pulseAnimation = false
-            delay(2000)
-        }
-    }
+    // Click animation
+    val clickScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.95f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "clickScale"
+    )
+
+    // Glow effect for non-responded cards
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = if (!userResponded) 0.3f else 0f,
+        targetValue = if (!userResponded) 0.7f else 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = 2000,
+                easing = EaseInOutSine
+            ),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glowAlpha"
+    )
 
     Card(
         modifier = Modifier
             .width(300.dp)
-            .height(380.dp) // Increased height to accommodate reactions
+            .height(380.dp)
             .padding(8.dp)
-            .clickable { onClick() }
             .graphicsLayer {
-                scaleX = animatedScale.value
-                scaleY = animatedScale.value
+                scaleX = heartbeatScale * clickScale
+                scaleY = heartbeatScale * clickScale
+            }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null // We handle our own visual feedback
+            ) {
+                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                onClick()
             },
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = 6.dp,
-            pressedElevation = 8.dp
+            defaultElevation = if (isPressed) 12.dp else 6.dp,
+            pressedElevation = 12.dp
         ),
-        colors = cardColors
+        colors = cardColors,
+        border = if (!userResponded) {
+            androidx.compose.foundation.BorderStroke(
+                2.dp,
+                MaterialTheme.colorScheme.primary.copy(alpha = glowAlpha)
+            )
+        } else {
+            androidx.compose.foundation.BorderStroke(
+                1.dp,
+                Color.Green.copy(alpha = 0.5f)
+            )
+        }
     ) {
+        // Detect press state
+        LaunchedEffect(interactionSource) {
+            interactionSource.interactions.collect { interaction ->
+                when (interaction) {
+                    is androidx.compose.foundation.interaction.PressInteraction.Press -> {
+                        isPressed = true
+                    }
+                    is androidx.compose.foundation.interaction.PressInteraction.Release,
+                    is androidx.compose.foundation.interaction.PressInteraction.Cancel -> {
+                        isPressed = false
+                    }
+                }
+            }
+        }
+
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
@@ -123,13 +185,19 @@ fun ChallengeCard(
                     modifier = Modifier.fillMaxSize()
                 )
 
-                // Overlay for time remaining
+                // Overlay for time remaining with fade animation
+                val timeOverlayAlpha by animateFloatAsState(
+                    targetValue = if (!userResponded) 1f else 0.7f,
+                    animationSpec = tween(300),
+                    label = "timeOverlayAlpha"
+                )
+
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(12.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0x99000000))
+                        .background(Color(0x99000000).copy(alpha = timeOverlayAlpha))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Row(
@@ -153,15 +221,32 @@ fun ChallengeCard(
                     }
                 }
 
-                // Challenge Button
+                // Challenge Button with animation
                 if (!userResponded) {
+                    val buttonScale by animateFloatAsState(
+                        targetValue = if (isPressed) 1.1f else 1f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessHigh
+                        ),
+                        label = "buttonScale"
+                    )
+
                     Button(
-                        onClick = onClick,
+                        onClick = {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onClick()
+                        },
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(12.dp),
+                            .padding(12.dp)
+                            .scale(buttonScale),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(
+                            defaultElevation = 4.dp,
+                            pressedElevation = 8.dp
                         )
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -175,30 +260,58 @@ fun ChallengeCard(
                         }
                     }
                 } else {
+                    // "Completed" badge with slide-in animation
+                    val completeBadgeScale by animateFloatAsState(
+                        targetValue = 1f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioLowBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        ),
+                        label = "completeBadgeScale"
+                    )
+
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(12.dp)
+                            .scale(completeBadgeScale)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0x99000000))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .background(Color(0xFF4CAF50))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
-                        Text(
-                            text = "Erledigt!",
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Erledigt!",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
 
-            // Challenge Title
+            // Challenge Title with subtle animation
+            val titleAlpha by animateFloatAsState(
+                targetValue = if (userResponded) 0.8f else 1f,
+                animationSpec = tween(300),
+                label = "titleAlpha"
+            )
+
             Text(
                 text = title,
                 fontWeight = FontWeight.Bold,
                 fontSize = 20.sp,
-                color = Color.Black,
+                color = Color.Black.copy(alpha = titleAlpha),
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
@@ -206,7 +319,7 @@ fun ChallengeCard(
             Text(
                 text = description,
                 fontSize = 14.sp,
-                color = Color.DarkGray,
+                color = Color.DarkGray.copy(alpha = if (userResponded) 0.7f else 1f),
                 modifier = Modifier
                     .padding(horizontal = 16.dp)
                     .weight(1f),
@@ -214,35 +327,52 @@ fun ChallengeCard(
                 overflow = TextOverflow.Ellipsis
             )
 
-            // Reaction Bar
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            // Reaction Bar with entrance animation
+            AnimatedVisibility(
+                visible = true,
+                enter = slideInVertically(
+                    initialOffsetY = { it },
+                    animationSpec = tween(600, delayMillis = 200)
+                ) + fadeIn(animationSpec = tween(600, delayMillis = 200))
             ) {
-                ReactionBar(
-                    reactions = reactions,
-                    onReactionSelected = { reactionId ->
-                        reactions = reactions.map { reaction ->
-                            if (reaction.id == reactionId) {
-                                reaction.copy(count = reaction.count + 1)
-                            } else {
-                                reaction
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    ReactionBar(
+                        reactions = reactions,
+                        onReactionSelected = { reactionId ->
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            reactions = reactions.map { reaction ->
+                                if (reaction.id == reactionId) {
+                                    reaction.copy(count = reaction.count + 1)
+                                } else {
+                                    reaction
+                                }
                             }
                         }
-                    }
-                )
+                    )
+                }
             }
 
-            // Friends Progress
+            // Friends Progress with animated progress
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
             ) {
-                // Friend Response Indicator
+                val animatedProgress by animateFloatAsState(
+                    targetValue = friendsResponded.toFloat() / totalFriends.toFloat(),
+                    animationSpec = tween(
+                        durationMillis = 1000,
+                        easing = EaseOutCubic
+                    ),
+                    label = "progressAnimation"
+                )
+
                 LinearProgressIndicator(
-                    progress = friendsResponded.toFloat() / totalFriends.toFloat(),
+                    progress = { animatedProgress },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(6.dp)
@@ -297,16 +427,5 @@ fun ChallengeCardPreview() {
                 totalFriends = 7
             )
         }
-    }
-}
-
-@Composable
-@Preview(showBackground = true)
-fun ReactionGridPreview() {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = Color(0xFFF5F5F5)
-    ) {
-
     }
 }

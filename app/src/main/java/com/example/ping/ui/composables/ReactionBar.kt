@@ -158,13 +158,13 @@ fun ReactionBarPreview() {
             Reaction(
                 id = "laugh",
                 icon = Icons.Default.EmojiEmotions,
-                color = Color.Yellow,
+                color = Color.Black,
                 count = 3
             ),
             Reaction(
                 id = "wow",
                 icon = Icons.Default.SentimentVerySatisfied,
-                color = Color.Orange,
+                color = Color.Blue,
                 count = 2
             )
         )
