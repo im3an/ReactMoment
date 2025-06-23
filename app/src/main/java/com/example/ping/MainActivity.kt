@@ -21,7 +21,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ping.R
-import com.example.ping.ui.composables.RadialReactionBar
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -370,8 +369,6 @@ fun FriendsResponsesScreen(
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
-
-                    RadialReactionBar()
                 }
             }
         }

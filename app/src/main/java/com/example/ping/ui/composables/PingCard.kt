@@ -6,8 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,6 +26,8 @@ import androidx.compose.ui.unit.sp
 import com.example.ping.R
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.example.ping.ui.composables.ReactionBar
+import com.example.ping.ui.composables.Reaction
 
 @Composable
 fun ChallengeCard(
@@ -39,6 +40,31 @@ fun ChallengeCard(
     totalFriends: Int = 5,
     onClick: () -> Unit = {}
 ) {
+    var reactions by remember {
+        mutableStateOf(
+            listOf(
+                Reaction(
+                    id = "like",
+                    icon = Icons.Default.Favorite,
+                    color = Color.Red,
+                    count = 0
+                ),
+                Reaction(
+                    id = "laugh",
+                    icon = Icons.Default.EmojiEmotions,
+                    color = Color(0xFFFFCA28),
+                    count = 0
+                ),
+                Reaction(
+                    id = "wow",
+                    icon = Icons.Default.SentimentVerySatisfied,
+                    color = Color(0xFFFF9800),
+                    count = 0
+                )
+            )
+        )
+    }
+
     val cardColors = if (userResponded) {
         CardDefaults.cardColors(
             containerColor = Color(0xFFF0F7FF)
@@ -67,7 +93,7 @@ fun ChallengeCard(
     Card(
         modifier = Modifier
             .width(300.dp)
-            .height(320.dp)
+            .height(380.dp) // Increased height to accommodate reactions
             .padding(8.dp)
             .clickable { onClick() }
             .graphicsLayer {
@@ -187,6 +213,26 @@ fun ChallengeCard(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
+
+            // Reaction Bar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                ReactionBar(
+                    reactions = reactions,
+                    onReactionSelected = { reactionId ->
+                        reactions = reactions.map { reaction ->
+                            if (reaction.id == reactionId) {
+                                reaction.copy(count = reaction.count + 1)
+                            } else {
+                                reaction
+                            }
+                        }
+                    }
+                )
+            }
 
             // Friends Progress
             Column(
